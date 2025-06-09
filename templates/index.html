@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Optimizer - CSV Upload</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+         crossorigin=""/>
+    
+    <!-- Leaflet JavaScript -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+           integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+           crossorigin=""></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 800px;
+            margin: 50px auto;
+        }
+        .main-layout {
+            display: flex;
+            height: 100vh;
+            background: white;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            background-color: #fafafa;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        .upload-area:hover {
+            border-color: #007bff;
+        }
+        .upload-area.drag-over {
+            border-color: #007bff;
+            background-color: #e7f3ff;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            display: none;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .stat-item {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .stat-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 14px;
+        }
+        .stat-value {
+            font-size: 18px;
+            color: #333;
+            margin-top: 5px;
+        }
+
+        .text-success {
+            color: #28a745 !important;
+            font-weight: bold;
+        }
+
+        .sidebar {
+            width: 350px;
+            background: #f8f9fa;
+            border-right: 1px solid #dee2e6;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+        }
+
+        #routeMap {
+            height: 100vh;
+            width: 100%;
+        }
+
+        .route-list {
+            margin-top: 20px;
+        }
+
+        .route-item {
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin: 10px 0;
+            padding: 0;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .route-header, .route-stats {
+            padding: 15px;
+            cursor: pointer;
+        }
+
+        .route-header:hover, .route-stats:hover {
+            background: #f8f9fa;
+        }
+
+        .route-item:hover {
+            border-color: #007bff;
+            box-shadow: 0 2px 8px rgba(0,123,255,0.15);
+        }
+
+        .route-item.selected {
+            border-color: #007bff;
+            background: #e7f3ff;
+            box-shadow: 0 2px 8px rgba(0,123,255,0.25);
+        }
+
+        .route-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .route-title {
+            font-weight: bold;
+            color: #333;
+            font-size: 16px;
+        }
+
+        .route-improvement {
+            background: #28a745;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .route-improvement.low {
+            background: #6c757d;
+        }
+
+        .route-improvement.medium {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .route-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .upload-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+        }
+
+        .upload-area {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            background-color: #fafafa;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .map-header {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+            display: none;
+        }
+
+        .map-header.show {
+            display: block;
+        }
+
+        .clear-selection {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1001;
+            display: none;
+        }
+
+        .clear-selection.show {
+            display: block;
+        }
+
+        .map-legend {
+            background: white;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+        }
+
+        .legend-line {
+            width: 30px;
+            height: 3px;
+            margin-right: 10px;
+            border-radius: 2px;
+        }
+
+        .legend-original {
+            background-color: #dc3545;
+        }
+
+        .legend-optimized {
+            background-color: #28a745;
+        }
+
+        /* Route Details Styling */
+        .route-expand-toggle {
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            padding: 8px 15px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #007bff;
+            text-align: center;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .route-expand-toggle:hover {
+            background: #e9ecef;
+        }
+
+        .expand-icon {
+            font-weight: bold;
+            margin-right: 5px;
+        }
+
+        .route-details {
+            border-top: 1px solid #dee2e6;
+            background: #f8f9fa;
+        }
+
+        .stops-list {
+            padding: 15px;
+        }
+
+        .stop-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            position: relative;
+        }
+
+        .stop-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .stop-number {
+            background: #007bff;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .start-stop .stop-number {
+            background: #28a745;
+        }
+
+        .end-stop .stop-number {
+            background: #dc3545;
+        }
+
+        .stop-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .stop-customer {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 2px;
+        }
+
+        .stop-address {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 1px;
+        }
+
+        .stop-location {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .stop-moved {
+            font-size: 11px;
+            color: #007bff;
+            font-style: italic;
+            margin-top: 2px;
+        }
+
+        .segment-distance {
+            text-align: center;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+
+        .distance-value {
+            font-size: 11px;
+            font-weight: bold;
+            color: #28a745;
+            background: #e8f5e8;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-bottom: 2px;
+        }
+
+        .distance-arrow {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .no-details {
+            padding: 15px;
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <!-- Upload Interface (shown initially) -->
+    <div class="container" id="uploadInterface">
+        <h1>🚛 Route Optimizer</h1>
+        <p>Upload a CSV file with route data to get started</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <p>📁 Click here or drag & drop your CSV file</p>
+            <input type="file" id="fileInput" accept=".csv">
+            <button type="button" onclick="document.getElementById('fileInput').click()">
+                Choose File
+            </button>
+        </div>
+        
+                <!-- Optimization will use air distance calculation -->
+
+        <div id="results" class="results"></div>
+    </div>
+
+    <!-- Main Application Layout (shown after upload) -->
+    <div class="main-layout" id="mainLayout" style="display: none;">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="upload-section">
+                <h3 style="margin: 0 0 15px 0;">🚛 Route Optimizer</h3>
+                <button onclick="resetToUpload()" style="background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                    📁 Upload New File
+                </button>
+            </div>
+
+            <div id="routeSummary" style="display: none;">
+                <h4 style="margin: 0 0 15px 0;">📊 Optimization Summary</h4>
+                <div id="summaryStats" class="stats" style="margin-bottom: 20px;"></div>
+                    </div>
+
+            <div id="routeListContainer" style="display: none;">
+                <h4 style="margin: 0 0 10px 0;">🛣️ Routes</h4>
+                <p style="font-size: 12px; color: #666; margin: 0 0 15px 0;">
+                    Click on a route to view on map
+                </p>
+                <div id="routeList" class="route-list"></div>
+                    </div>
+                </div>
+
+        <!-- Map Container -->
+        <div class="map-container">
+            <div id="routeMap"></div>
+            
+            <!-- Map Header (shown when route is selected) -->
+            <div id="mapHeader" class="map-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h4 style="margin: 0; color: #333;" id="selectedRouteTitle">Route Details</h4>
+                        <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;" id="selectedRouteInfo">Select a route to view details</p>
+                    </div>
+                    <div class="map-legend" style="margin: 0;">
+                        <div class="legend-item" style="margin: 2px 0;">
+                            <div class="legend-line legend-original"></div>
+                            <span style="font-size: 12px;">Original Route</span>
+                        </div>
+                        <div class="legend-item" style="margin: 2px 0;">
+                            <div class="legend-line legend-optimized"></div>
+                            <span style="font-size: 12px;">Optimized Route</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Clear Selection Button -->
+            <button id="clearSelection" class="clear-selection" onclick="clearRouteSelection()">
+                ✕ Clear Selection
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let routeMap = null;
+        let originalPolyline = null;
+        let optimizedPolyline = null;
+        let markersGroup = null;
+        let routeData = null;
+        let selectedRouteId = null;
+
+        // UI Elements
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const results = document.getElementById('results');
+        const uploadInterface = document.getElementById('uploadInterface');
+        const mainLayout = document.getElementById('mainLayout');
+        const routeList = document.getElementById('routeList');
+        const mapHeader = document.getElementById('mapHeader');
+        const clearSelection = document.getElementById('clearSelection');
+
+        // Handle file input change
+        fileInput.addEventListener('change', (e) => {
+            console.log('File input changed:', e.target.files);
+            if (e.target.files.length > 0) {
+                console.log('Starting upload for file:', e.target.files[0].name);
+                uploadFile(e.target.files[0]);
+            }
+        });
+
+        // Handle drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        });
+
+        // Clear selection button
+        if (clearSelection) {
+            clearSelection.addEventListener('click', clearRouteSelection);
+        }
+
+        // Back to upload button
+        const backToUpload = document.getElementById('backToUpload');
+        if (backToUpload) {
+            backToUpload.addEventListener('click', resetToUpload);
+        }
+
+        // Handle routing option changes
+        document.querySelectorAll('input[name="distance_type"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                const routingProfileSection = document.getElementById('routingProfileSection');
+                if (this.value === 'road') {
+                    routingProfileSection.style.display = 'block';
+                } else {
+                    routingProfileSection.style.display = 'none';
+                }
+            });
+        });
+
+        function uploadFile(file) {
+            console.log('Upload function called for file:', file.name);
+            
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                console.log('File is not CSV, showing error');
+                showError('Please select a CSV file');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+            console.log('FormData created, file appended');
+            
+            // No routing options needed for now
+
+            // Show loading
+            results.innerHTML = `<p>📊 Processing CSV file...</p>`;
+            results.style.display = 'block';
+            console.log('Loading message displayed');
+
+            console.log('About to start fetch request...');
+            
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('Response received:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Upload response:', data);
+                if (data.success) {
+                    if (data.stats.optimization && data.stats.optimization.completed) {
+                        // Switch to main layout and show routes
+                        console.log('Switching to main layout');
+                        switchToMainLayout(data);
+                    } else {
+                        // Show results in upload interface
+                        console.log('Showing upload results');
+                        showUploadResults(data);
+                    }
+                } else {
+                    console.error('Upload failed:', data.error);
+                    showError(data.error || 'Upload failed');
+                }
+            })
+            .catch(error => {
+                console.error('Fetch error:', error);
+                showError('Network error: ' + error.message);
+                results.innerHTML = `<p style="color: red;">❌ Error: ${error.message}</p>`;
+            });
+        }
+
+        function switchToMainLayout(data) {
+            // Hide upload interface
+            uploadInterface.style.display = 'none';
+            mainLayout.style.display = 'flex';
+
+            // Store route data
+            routeData = data.stats.optimization;
+
+            // Initialize map
+            initializeMap();
+
+            // Populate sidebar
+            populateSidebar(data.stats);
+
+            // Show route list
+            populateRouteList(routeData.route_comparisons);
+        }
+
+        function populateSidebar(stats) {
+            // Show summary section
+            document.getElementById('routeSummary').style.display = 'block';
+            const summaryStats = document.getElementById('summaryStats');
+            const summary = routeData.summary;
+            
+            summaryStats.innerHTML = `
+                <div class="stat-item">
+                    <div class="stat-label">Total Routes</div>
+                    <div class="stat-value">${summary.total_routes}</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Distance Saved</div>
+                    <div class="stat-value">${summary.total_distance_saved} km</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Avg Improvement</div>
+                    <div class="stat-value">${summary.average_improvement_pct}%</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Processing Time</div>
+                    <div class="stat-value">${routeData.total_processing_time}s</div>
+                </div>
+            `;
+
+            // Show route list section
+            document.getElementById('routeListContainer').style.display = 'block';
+        }
+
+        function populateRouteList(routeComparisons) {
+            const multiStopRoutes = routeComparisons.filter(route => route.stops_count > 1);
+            
+            let html = '';
+            multiStopRoutes.forEach(route => {
+                const improvementClass = route.improvement_percentage > 20 ? 'high' : 
+                                       route.improvement_percentage > 10 ? 'medium' : 'low';
+                
+                html += `
+                    <div class="route-item" data-route-id="${route.route_id}">
+                        <div class="route-header" onclick="selectRoute('${route.route_id}')">
+                            <div class="route-title">${route.route_id}</div>
+                            <div class="route-improvement ${improvementClass}">
+                                ${route.improvement_percentage > 0 ? '+' : ''}${route.improvement_percentage}%
+                            </div>
+                        </div>
+                        <div class="route-stats" onclick="selectRoute('${route.route_id}')">
+                            <div><strong>${route.stops_count}</strong> stops</div>
+                            <div><strong>${route.distance_saved_km}</strong> km saved</div>
+                            <div><strong>${route.original_distance_km}</strong> km → <strong>${route.optimized_distance_km}</strong> km</div>
+                            <div><small>${route.algorithm_used}</small></div>
+                        </div>
+                        <div class="route-expand-toggle" onclick="toggleRouteDetails('${route.route_id}')">
+                            <span class="expand-icon">▼</span> Show Details
+                        </div>
+                        <div class="route-details" id="details-${route.route_id}" style="display: none;">
+                            ${generateRouteDetails(route)}
+                        </div>
+                    </div>
+                `;
+            });
+
+            routeList.innerHTML = html;
+        }
+
+        function generateRouteDetails(route) {
+            if (!route.optimized_stops || route.optimized_stops.length === 0) {
+                return '<div class="no-details">No stop details available</div>';
+            }
+
+            let html = '<div class="stops-list">';
+            
+            route.optimized_stops.forEach((stop, index) => {
+                const isLast = index === route.optimized_stops.length - 1;
+                const nextDistance = isLast ? '' : calculateSegmentDistance(route, index);
+                
+                html += `
+                    <div class="stop-item ${index === 0 ? 'start-stop' : ''} ${isLast ? 'end-stop' : ''}">
+                        <div class="stop-number">${index + 1}</div>
+                        <div class="stop-info">
+                            <div class="stop-customer">${stop.customer}</div>
+                            <div class="stop-address">${stop.street || ''}</div>
+                            <div class="stop-location">${stop.postal_code} ${stop.city}</div>
+                            ${stop.original_position && stop.original_position !== (index + 1) ? 
+                                `<div class="stop-moved">Originally stop #${stop.original_position}</div>` : ''}
+                        </div>
+                        ${!isLast ? `
+                            <div class="segment-distance">
+                                <div class="distance-value">${nextDistance}</div>
+                                <div class="distance-arrow">↓</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            return html;
+        }
+
+        function calculateSegmentDistance(route, stopIndex) {
+            // Try to get distance from route segments if available
+            if (route.optimized_segments && route.optimized_segments[stopIndex]) {
+                const segment = route.optimized_segments[stopIndex];
+                return `${segment.distance_km ? segment.distance_km.toFixed(1) : '?.?'}km`;
+            }
+            
+            // Fallback: calculate air distance
+            if (route.optimized_stops && stopIndex < route.optimized_stops.length - 1) {
+                const fromStop = route.optimized_stops[stopIndex];
+                const toStop = route.optimized_stops[stopIndex + 1];
+                
+                if (fromStop.coordinates && toStop.coordinates) {
+                    const distance = calculateAirDistance(
+                        fromStop.coordinates.lat, fromStop.coordinates.lng,
+                        toStop.coordinates.lat, toStop.coordinates.lng
+                    );
+                    return `~${distance.toFixed(1)}km`;
+                }
+            }
+            
+            return '?.?km';
+        }
+
+        function calculateAirDistance(lat1, lng1, lat2, lng2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLng/2) * Math.sin(dLng/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function toggleRouteDetails(routeId) {
+            const detailsElement = document.getElementById(`details-${routeId}`);
+            const toggleElement = document.querySelector(`[data-route-id="${routeId}"] .route-expand-toggle`);
+            const iconElement = toggleElement.querySelector('.expand-icon');
+            
+            if (detailsElement.style.display === 'none') {
+                detailsElement.style.display = 'block';
+                iconElement.textContent = '▲';
+                toggleElement.innerHTML = '<span class="expand-icon">▲</span> Hide Details';
+            } else {
+                detailsElement.style.display = 'none';
+                iconElement.textContent = '▼';
+                toggleElement.innerHTML = '<span class="expand-icon">▼</span> Show Details';
+            }
+        }
+
+        function selectRoute(routeId) {
+            // Update selection state
+            selectedRouteId = routeId;
+            
+            // Update UI selection
+            document.querySelectorAll('.route-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            document.querySelector(`[data-route-id="${routeId}"]`).classList.add('selected');
+
+            // Find route data
+            const route = routeData.route_comparisons.find(r => r.route_id === routeId);
+            
+            // Plot route on map
+            plotSingleRoute(route);
+            
+            // Update map header
+            updateMapHeader(route);
+            
+            // Show map controls
+            mapHeader.classList.add('show');
+            clearSelection.classList.add('show');
+            
+            // Auto-expand route details when selected
+            const detailsElement = document.getElementById(`details-${routeId}`);
+            if (detailsElement && detailsElement.style.display === 'none') {
+                toggleRouteDetails(routeId);
+            }
+        }
+
+        function clearRouteSelection() {
+            selectedRouteId = null;
+            
+            // Clear UI selection
+            document.querySelectorAll('.route-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Collapse all expanded route details
+            document.querySelectorAll('.route-details').forEach(details => {
+                if (details.style.display !== 'none') {
+                    const routeId = details.id.replace('details-', '');
+                    toggleRouteDetails(routeId);
+                }
+            });
+            
+            // Clear map
+            clearMap();
+            
+            // Hide map controls
+            mapHeader.classList.remove('show');
+            clearSelection.classList.remove('show');
+        }
+
+        function updateMapHeader(route) {
+            document.getElementById('selectedRouteTitle').textContent = `${route.route_id} - ${route.stops_count} stops`;
+            
+            // Determine routing type
+            let routingType = 'air distance';
+            let routingIcon = '✈️';
+            if (route.optimized_segments && route.optimized_segments.length > 0) {
+                const hasRoadRouting = route.optimized_segments.some(segment => segment.type === 'road');
+                if (hasRoadRouting) {
+                    routingType = 'road routing';
+                    routingIcon = '🛣️';
+                }
+            }
+            
+            document.getElementById('selectedRouteInfo').textContent = 
+                `${route.distance_saved_km}km saved (${route.improvement_percentage}% improvement) using ${route.algorithm_used} | ${routingIcon} ${routingType}`;
+        }
+
+        function resetToUpload() {
+            // Clear data
+            routeData = null;
+            selectedRouteId = null;
+            
+            // Reset UI
+            uploadInterface.style.display = 'block';
+            mainLayout.style.display = 'none';
+            results.innerHTML = '';
+            results.style.display = 'none';
+            
+            // Clear file input
+            fileInput.value = '';
+            
+            // Destroy map
+            if (routeMap) {
+                routeMap.remove();
+                routeMap = null;
+            }
+        }
+
+        function showUploadResults(data) {
+            const stats = data.stats;
+            let html = `
+                <div class="success">
+                    ✅ ${data.message}
+                </div>
+                
+                <h3>📊 File Statistics</h3>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-label">Filename</div>
+                        <div class="stat-value">${stats.filename}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Total Rows</div>
+                        <div class="stat-value">${stats.total_rows.toLocaleString()}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Columns</div>
+                        <div class="stat-value">${stats.total_columns}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Memory Usage</div>
+                        <div class="stat-value">${stats.memory_usage}</div>
+                    </div>
+                </div>
+
+                <h4>📋 Columns Found:</h4>
+                <p><code>${stats.columns.join(', ')}</code></p>
+            `;
+
+            // Show validation results
+            if (stats.validation) {
+                const validation = stats.validation;
+                html += `<h4>🔍 Data Validation</h4>`;
+                
+                if (validation.is_valid) {
+                    html += `<div class="success">✅ Data is suitable for route optimization!</div>`;
+                } else {
+                    html += `<div class="error">❌ Data validation failed - missing required columns</div>`;
+                }
+                
+                // Show suggestions
+                if (validation.suggestions && validation.suggestions.length > 0) {
+                    html += `<div style="margin: 10px 0;"><strong>Analysis:</strong><ul>`;
+                    validation.suggestions.forEach(suggestion => {
+                        html += `<li>${suggestion}</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+                
+                // Show warnings
+                if (validation.warnings && validation.warnings.length > 0) {
+                    html += `<div style="margin: 10px 0; color: #856404; background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 5px;">
+                        <strong>⚠️ Warnings:</strong><ul>`;
+                    validation.warnings.forEach(warning => {
+                        html += `<li>${warning}</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+                
+                // Show found columns
+                if (validation.route_column) {
+                    html += `<div style="margin: 10px 0;"><strong>Route Column:</strong> ${validation.route_column}</div>`;
+                }
+                
+                if (validation.address_columns && Object.keys(validation.address_columns).length > 0) {
+                    html += `<div style="margin: 10px 0;"><strong>Address Columns:</strong><ul>`;
+                    Object.entries(validation.address_columns).forEach(([type, column]) => {
+                        html += `<li><strong>${type}:</strong> ${column}</li>`;
+                    });
+                    html += '</ul></div>';
+                }
+            }
+
+            if (stats.route_columns && stats.route_columns.length > 0) {
+                html += `
+                    <h4>🛣️ Route Columns Detected:</h4>
+                    <ul>
+                `;
+                stats.route_columns.forEach(col => {
+                    const uniqueCount = stats[`unique_${col}`];
+                    html += `<li><strong>${col}</strong> (${uniqueCount} unique routes)</li>`;
+                });
+                html += '</ul>';
+            }
+
+            if (stats.sample_data && stats.sample_data.length > 0) {
+                html += `
+                    <h4>👀 Sample Data (First 5 Rows):</h4>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                            <thead>
+                                <tr style="background-color: #f8f9fa;">
+                `;
+                stats.columns.forEach(col => {
+                    html += `<th style="border: 1px solid #dee2e6; padding: 8px; text-align: left;">${col}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+                
+                stats.sample_data.forEach(row => {
+                    html += '<tr>';
+                    stats.columns.forEach(col => {
+                        const value = row[col] || '';
+                        html += `<td style="border: 1px solid #dee2e6; padding: 8px;">${value}</td>`;
+                    });
+                    html += '</tr>';
+                });
+                html += '</tbody></table></div>';
+            }
+
+            // Show optimization results
+            if (stats.optimization) {
+                const opt = stats.optimization;
+                html += `<h3>🚛 Route Optimization Results</h3>`;
+                
+                if (opt.completed) {
+                    const summary = opt.summary;
+                    html += `
+                        <div class="success">
+                            ✅ Optimization completed successfully! 
+                            ${summary.total_distance_saved}km saved (${summary.average_improvement_pct}% average improvement)
+                        </div>
+                        
+                        <div class="stats">
+                            <div class="stat-item">
+                                <div class="stat-label">Total Routes</div>
+                                <div class="stat-value">${summary.total_routes}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Routes Optimized</div>
+                                <div class="stat-value">${summary.optimized_routes}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Total Stops</div>
+                                <div class="stat-value">${summary.total_stops}</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Distance Saved</div>
+                                <div class="stat-value">${summary.total_distance_saved} km</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Avg Improvement</div>
+                                <div class="stat-value">${summary.average_improvement_pct}%</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-label">Processing Time</div>
+                                <div class="stat-value">${opt.total_processing_time}s</div>
+            </div>
+        </div>
+        
+                        <h4>📈 Route-by-Route Comparison</h4>
+                    `;
+                    
+                    // Add map visualization
+                    html += `
+                        <h4>🗺️ Route Visualization</h4>
+                        <div class="map-container">
+                            <div id="routeMap"></div>
+                            <div class="map-legend">
+                                <div class="legend-item">
+                                    <div class="legend-line legend-original"></div>
+                                    <span>Original Route (dashed)</span>
+                                </div>
+                                <div class="legend-item">
+                                    <div class="legend-line legend-optimized"></div>
+                                    <span>Optimized Route (solid)</span>
+                                </div>
+                                                                 <div style="margin-top: 10px; font-size: 12px; color: #6c757d;">
+                                     Click on markers to see stop details. Use buttons below to focus on specific routes.
+                                 </div>
+                                 <div id="routeButtons" style="margin-top: 10px;">
+                                     <!-- Route selection buttons will be added here -->
+            </div>
+        </div>
+    </div>
+                    `;
+                    
+                    // Route comparisons
+                    if (opt.route_comparisons && opt.route_comparisons.length > 0) {
+                        opt.route_comparisons.forEach(route => {
+                            const improvementClass = route.improvement_percentage > 0 ? 'success' : 
+                                                   route.stops_count === 1 ? 'info' : 'warning';
+                            
+                            html += `
+                                <div style="border: 1px solid #dee2e6; margin: 10px 0; padding: 15px; border-radius: 5px; background-color: #f8f9fa;">
+                                    <h5 style="margin: 0 0 10px 0; color: #495057;">
+                                        🚛 ${route.route_id} 
+                                        <span style="font-size: 0.8em; color: #6c757d;">
+                                            (${route.stops_count} ${route.stops_count === 1 ? 'stop' : 'stops'})
+                                        </span>
+                                    </h5>
+                                    
+                                    <div class="stats" style="margin-bottom: 15px;">
+                                        <div class="stat-item">
+                                            <div class="stat-label">Original Distance</div>
+                                            <div class="stat-value">${route.original_distance_km} km</div>
+                                        </div>
+                                        <div class="stat-item">
+                                            <div class="stat-label">Optimized Distance</div>
+                                            <div class="stat-value">${route.optimized_distance_km} km</div>
+                                        </div>
+                                        <div class="stat-item">
+                                            <div class="stat-label">Distance Saved</div>
+                                            <div class="stat-value ${route.distance_saved_km > 0 ? 'text-success' : ''}">${route.distance_saved_km} km</div>
+                                        </div>
+                                        <div class="stat-item">
+                                            <div class="stat-label">Improvement</div>
+                                            <div class="stat-value ${route.improvement_percentage > 0 ? 'text-success' : ''}">${route.improvement_percentage}%</div>
+                                        </div>
+                                        <div class="stat-item">
+                                            <div class="stat-label">Algorithm</div>
+                                            <div class="stat-value">${route.algorithm_used}</div>
+                                        </div>
+                                    </div>
+                            `;
+                            
+                            // Show stop details for multi-stop routes
+                            if (route.stops_count > 1 && route.original_stops && route.optimized_stops) {
+                                html += `
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+                                        <div>
+                                            <h6 style="margin: 0 0 10px 0; color: #dc3545;">📍 Original Order</h6>
+                                            <ol style="margin: 0; padding-left: 20px;">
+                                `;
+                                
+                                route.original_stops.forEach(stop => {
+                                    html += `<li style="margin-bottom: 5px; font-size: 0.9em;">
+                                        <strong>${stop.customer}</strong><br>
+                                        <span style="color: #6c757d;">${stop.postal_code} ${stop.city}</span>
+                                    </li>`;
+                                });
+                                
+                                html += `
+                                            </ol>
+                                        </div>
+                                        <div>
+                                            <h6 style="margin: 0 0 10px 0; color: #28a745;">🎯 Optimized Order</h6>
+                                            <ol style="margin: 0; padding-left: 20px;">
+                                `;
+                                
+                                route.optimized_stops.forEach(stop => {
+                                    const movedText = stop.original_position && stop.original_position !== stop.stop_number ? 
+                                        ` <small style="color: #007bff;">(was #${stop.original_position})</small>` : '';
+                                    html += `<li style="margin-bottom: 5px; font-size: 0.9em;">
+                                        <strong>${stop.customer}</strong>${movedText}<br>
+                                        <span style="color: #6c757d;">${stop.postal_code} ${stop.city}</span>
+                                    </li>`;
+                                });
+                                
+                                html += `
+                                            </ol>
+                                        </div>
+                                    </div>
+                                `;
+                            } else if (route.stops_count === 1) {
+                                html += `<p style="color: #6c757d; font-style: italic; margin: 10px 0;">Single stop route - no optimization needed</p>`;
+                            }
+                            
+                            html += '</div>';
+                        });
+                    }
+                    
+                    // Download section
+                    html += `
+                        <div style="margin-top: 20px; padding: 15px; background-color: #e7f3ff; border: 1px solid #b3d7ff; border-radius: 5px;">
+                            <h5 style="margin: 0 0 10px 0; color: #004085;">💾 Download Results</h5>
+                            <p style="margin: 0 0 10px 0; color: #004085;">
+                                The optimized route data is ready for download with the new stop sequences.
+                            </p>
+                            <button onclick="downloadOptimizedData()" style="background-color: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">
+                                📥 Download Optimized Routes (CSV)
+                            </button>
+                        </div>
+                    `;
+                    
+                } else {
+                    html += `<div class="error">❌ ${opt.message || 'Optimization failed'}</div>`;
+                    if (opt.error) {
+                        html += `<p style="color: #721c24; background-color: #f8d7da; padding: 10px; border-radius: 5px; margin: 10px 0;">
+                            <strong>Error details:</strong> ${opt.error}
+                        </p>`;
+                    }
+                }
+            }
+
+            results.innerHTML = html;
+            results.style.display = 'block';
+            
+            // Store optimization data globally for download
+            if (stats.optimization && stats.optimization.completed) {
+                window.optimizationData = stats.optimization;
+                
+                // Plot routes on map after a short delay to ensure DOM is ready
+                setTimeout(() => {
+                    const routeComparisons = stats.optimization.route_comparisons;
+                    if (routeComparisons && routeComparisons.length > 0) {
+                        // Find routes with multiple stops for better visualization
+                        const multiStopRoutes = routeComparisons.filter(route => route.stops_count > 1);
+                        
+                        // Add route selection buttons
+                        const routeButtonsContainer = document.getElementById('routeButtons');
+                        if (routeButtonsContainer && multiStopRoutes.length > 1) {
+                            let buttonsHtml = '<strong>Focus on Route:</strong> ';
+                            buttonsHtml += `<button onclick="plotMultipleRoutes(window.optimizationData.route_comparisons.filter(r => r.stops_count > 1))" 
+                                                   style="margin: 2px; padding: 5px 10px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">
+                                               All Routes
+                                           </button>`;
+                            
+                            multiStopRoutes.forEach((route, index) => {
+                                const improvement = route.improvement_percentage;
+                                const buttonColor = improvement > 20 ? '#28a745' : improvement > 10 ? '#ffc107' : '#6c757d';
+                                buttonsHtml += `<button onclick="plotRouteComparison(window.optimizationData.route_comparisons.find(r => r.route_id === '${route.route_id}'))" 
+                                                       style="margin: 2px; padding: 5px 10px; background: ${buttonColor}; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">
+                                                   ${route.route_id} (${improvement}%)
+                                               </button>`;
+                            });
+                            routeButtonsContainer.innerHTML = buttonsHtml;
+                        }
+                        
+                        if (multiStopRoutes.length === 1) {
+                            // Single route - show detailed comparison
+                            plotRouteComparison(multiStopRoutes[0]);
+                        } else if (multiStopRoutes.length > 1) {
+                            // Multiple routes - show overview
+                            plotMultipleRoutes(multiStopRoutes);
+                        }
+                    }
+                }, 100);
+            }
+        }
+
+        function showError(message) {
+            results.innerHTML = `<div class="error">❌ ${message}</div>`;
+            results.style.display = 'block';
+        }
+
+        // Map variables (moved to top of script)
+
+        function initializeMap() {
+            if (routeMap) {
+                routeMap.remove();
+            }
+            
+            // Initialize map centered on Munich (default location)
+            routeMap = L.map('routeMap').setView([48.1351, 11.5820], 10);
+            
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(routeMap);
+            
+            // Initialize marker group
+            markersGroup = L.layerGroup().addTo(routeMap);
+        }
+
+        function plotSingleRoute(route) {
+            clearMap();
+
+            const originalStops = route.original_stops;
+            const optimizedStops = route.optimized_stops;
+            const originalSegments = route.original_segments || [];
+            const optimizedSegments = route.optimized_segments || [];
+
+            if (originalStops.length === 0 || optimizedStops.length === 0) {
+                return;
+            }
+
+            // Draw route segments (actual road paths or straight lines)
+            if (originalSegments.length > 0) {
+                originalSegments.forEach(segment => {
+                    if (segment.geometry && segment.geometry.coordinates) {
+                        // Convert coordinates from [lng, lat] to [lat, lng] for Leaflet
+                        const coords = segment.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                        const polyline = L.polyline(coords, {
+                            color: '#dc3545',
+                            weight: 4,
+                            opacity: 0.7,
+                            dashArray: segment.type === 'air' ? '10, 10' : '8, 12'
+                        }).addTo(routeMap);
+                        
+                        if (!originalPolyline) {
+                            originalPolyline = L.layerGroup().addTo(routeMap);
+                        }
+                        originalPolyline.addLayer(polyline);
+                    }
+                });
+            } else {
+                // Fallback to straight lines
+                const originalCoords = originalStops.map(stop => [stop.coordinates.lat, stop.coordinates.lng]);
+                originalPolyline = L.polyline(originalCoords, {
+                    color: '#dc3545',
+                    weight: 4,
+                    opacity: 0.7,
+                    dashArray: '10, 10'
+                }).addTo(routeMap);
+            }
+
+            if (optimizedSegments.length > 0) {
+                optimizedSegments.forEach(segment => {
+                    if (segment.geometry && segment.geometry.coordinates) {
+                        // Convert coordinates from [lng, lat] to [lat, lng] for Leaflet
+                        const coords = segment.geometry.coordinates.map(coord => [coord[1], coord[0]]);
+                        const polyline = L.polyline(coords, {
+                            color: '#28a745',
+                            weight: 4,
+                            opacity: 0.8,
+                            dashArray: segment.type === 'air' ? '5, 5' : ''
+                        }).addTo(routeMap);
+                        
+                        if (!optimizedPolyline) {
+                            optimizedPolyline = L.layerGroup().addTo(routeMap);
+                        }
+                        optimizedPolyline.addLayer(polyline);
+                    }
+                });
+            } else {
+                // Fallback to straight lines
+                const optimizedCoords = optimizedStops.map(stop => [stop.coordinates.lat, stop.coordinates.lng]);
+                optimizedPolyline = L.polyline(optimizedCoords, {
+                    color: '#28a745',
+                    weight: 4,
+                    opacity: 0.8
+                }).addTo(routeMap);
+            }
+
+            // Add markers for stops with better styling
+            optimizedStops.forEach((stop, index) => {
+                const isStart = index === 0;
+                const marker = L.circleMarker([stop.coordinates.lat, stop.coordinates.lng], {
+                    radius: isStart ? 10 : 8,
+                    fillColor: isStart ? '#007bff' : '#ffc107',
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                });
+
+                const popupContent = `
+                    <div style="min-width: 200px;">
+                        <strong>Stop ${index + 1}${isStart ? ' (Start)' : ''}</strong><br>
+                        <strong>${stop.customer}</strong><br>
+                        ${stop.street}<br>
+                        ${stop.postal_code} ${stop.city}
+                        ${stop.original_position && stop.original_position !== stop.stop_number ? 
+                          `<br><small style="color: #007bff;">Originally position ${stop.original_position}</small>` : ''}
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                markersGroup.addLayer(marker);
+            });
+
+            // Fit map to show all segments and points
+            const allLayers = [];
+            if (originalPolyline) allLayers.push(originalPolyline);
+            if (optimizedPolyline) allLayers.push(optimizedPolyline);
+            if (markersGroup) allLayers.push(markersGroup);
+            
+            if (allLayers.length > 0) {
+                const group = new L.featureGroup(allLayers);
+                routeMap.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        function clearMap() {
+            if (originalPolyline) {
+                if (originalPolyline.clearLayers) {
+                    originalPolyline.clearLayers();
+                }
+                routeMap.removeLayer(originalPolyline);
+                originalPolyline = null;
+            }
+            if (optimizedPolyline) {
+                if (optimizedPolyline.clearLayers) {
+                    optimizedPolyline.clearLayers();
+                }
+                routeMap.removeLayer(optimizedPolyline);
+                optimizedPolyline = null;
+            }
+            if (markersGroup) {
+                markersGroup.clearLayers();
+            }
+        }
+
+        function plotRouteComparison(routeComparison) {
+            if (!routeMap) {
+                initializeMap();
+            }
+
+            // Clear existing layers
+            if (originalPolyline) routeMap.removeLayer(originalPolyline);
+            if (optimizedPolyline) routeMap.removeLayer(optimizedPolyline);
+            markersGroup.clearLayers();
+
+            const originalStops = routeComparison.original_stops;
+            const optimizedStops = routeComparison.optimized_stops;
+
+            if (originalStops.length === 0 || optimizedStops.length === 0) {
+                return;
+            }
+
+            // Extract coordinates for polylines
+            const originalCoords = originalStops.map(stop => [stop.coordinates.lat, stop.coordinates.lng]);
+            const optimizedCoords = optimizedStops.map(stop => [stop.coordinates.lat, stop.coordinates.lng]);
+
+            // Create polylines
+            originalPolyline = L.polyline(originalCoords, {
+                color: '#dc3545',
+                weight: 4,
+                opacity: 0.7,
+                dashArray: '10, 10'
+            }).addTo(routeMap);
+
+            optimizedPolyline = L.polyline(optimizedCoords, {
+                color: '#28a745',
+                weight: 4,
+                opacity: 0.8
+            }).addTo(routeMap);
+
+            // Add markers for stops
+            optimizedStops.forEach((stop, index) => {
+                const marker = L.circleMarker([stop.coordinates.lat, stop.coordinates.lng], {
+                    radius: 8,
+                    fillColor: index === 0 ? '#007bff' : '#ffc107',
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                });
+
+                const popupContent = `
+                    <div style="min-width: 200px;">
+                        <strong>Stop ${index + 1}${index === 0 ? ' (Start)' : ''}</strong><br>
+                        <strong>${stop.customer}</strong><br>
+                        ${stop.street}<br>
+                        ${stop.postal_code} ${stop.city}
+                        ${stop.original_position && stop.original_position !== stop.stop_number ? 
+                          `<br><small style="color: #007bff;">Originally position ${stop.original_position}</small>` : ''}
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                markersGroup.addLayer(marker);
+            });
+
+            // Fit map to show all points
+            const allCoords = [...originalCoords, ...optimizedCoords];
+            if (allCoords.length > 0) {
+                const group = new L.featureGroup([originalPolyline, optimizedPolyline]);
+                routeMap.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        function plotMultipleRoutes(routeComparisons) {
+            if (!routeMap) {
+                initializeMap();
+            }
+
+            // Clear existing layers
+            if (originalPolyline) routeMap.removeLayer(originalPolyline);
+            if (optimizedPolyline) routeMap.removeLayer(optimizedPolyline);
+            markersGroup.clearLayers();
+
+            const colors = ['#dc3545', '#28a745', '#007bff', '#ffc107', '#6f42c1', '#fd7e14'];
+            let allBounds = [];
+
+            routeComparisons.forEach((route, routeIndex) => {
+                if (route.stops_count <= 1) return;
+
+                const originalStops = route.original_stops;
+                const optimizedStops = route.optimized_stops;
+                const color = colors[routeIndex % colors.length];
+
+                // Original route (dashed)
+                const originalCoords = originalStops.map(stop => [stop.coordinates.lat, stop.coordinates.lng]);
+                const originalLine = L.polyline(originalCoords, {
+                    color: color,
+                    weight: 3,
+                    opacity: 0.5,
+                    dashArray: '10, 10'
+                }).addTo(routeMap);
+
+                // Optimized route (solid)
+                const optimizedCoords = optimizedStops.map(stop => [stop.coordinates.lat, stop.coordinates.lng]);
+                const optimizedLine = L.polyline(optimizedCoords, {
+                    color: color,
+                    weight: 4,
+                    opacity: 0.8
+                }).addTo(routeMap);
+
+                allBounds.push(...originalCoords, ...optimizedCoords);
+
+                // Add markers for optimized stops
+                optimizedStops.forEach((stop, index) => {
+                    const marker = L.circleMarker([stop.coordinates.lat, stop.coordinates.lng], {
+                        radius: 6,
+                        fillColor: color,
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+
+                    const popupContent = `
+                        <div style="min-width: 200px;">
+                            <strong>${route.route_id} - Stop ${index + 1}</strong><br>
+                            <strong>${stop.customer}</strong><br>
+                            ${stop.street}<br>
+                            ${stop.postal_code} ${stop.city}
+                            ${stop.original_position && stop.original_position !== stop.stop_number ? 
+                              `<br><small style="color: #007bff;">Was position ${stop.original_position}</small>` : ''}
+                        </div>
+                    `;
+
+                    marker.bindPopup(popupContent);
+                    markersGroup.addLayer(marker);
+                });
+            });
+
+            // Fit map to show all routes
+            if (allBounds.length > 0) {
+                const bounds = L.latLngBounds(allBounds);
+                routeMap.fitBounds(bounds.pad(0.1));
+            }
+        }
+
+        function downloadOptimizedData() {
+            if (!window.optimizationData || !window.optimizationData.optimized_data) {
+                alert('No optimization data available for download');
+                return;
+            }
+
+            const data = window.optimizationData.optimized_data;
+            
+            // Convert to CSV
+            if (data.length === 0) {
+                alert('No data to download');
+                return;
+            }
+            
+            const headers = Object.keys(data[0]);
+            let csv = headers.join(',') + '\n';
+            
+            data.forEach(row => {
+                const values = headers.map(header => {
+                    const value = row[header] || '';
+                    // Escape values that contain commas or quotes
+                    if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
+                        return '"' + value.replace(/"/g, '""') + '"';
+                    }
+                    return value;
+                });
+                csv += values.join(',') + '\n';
+            });
+            
+            // Create download
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'optimized_routes.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html> 

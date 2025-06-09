@@ -1,0 +1,10 @@
+# Minimal requirements for Vercel serverless deployment (Python 3.12 compatible)
+Flask==3.0.0
+pandas==2.1.4
+numpy==1.26.2
+Werkzeug==3.0.1
+requests==2.31.0
+
+# Optional packages for full functionality (local deployment only)
+# openrouteservice==2.3.3  # Works locally but may have issues in serverless
+# geopy==2.4.0  # Works locally but may have issues in serverless 
